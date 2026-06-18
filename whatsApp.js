@@ -6,6 +6,7 @@ const request = require("request");
 const bodyParser = require("body-parser");
 require("dotenv").config();
 const app = express();
+
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 app.use(bodyParser.json());
 app.use(
@@ -13,63 +14,89 @@ app.use(
     extended: false,
   })
 );
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Health Check Endpoint
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 app.get("/", (req, res) => {
   let resData = {
-    status: false,
-    answare: "",
+    status: true,
+    message: "WhatsApp Business API Node.js Server is running.",
   };
-  resData.status = true;
-  resData.message =
-    "Hello Every One Form From Code 180. This API is working......";
   return res.status(200).json(resData);
 });
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Send WhatsApp Message Endpoint
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 app.get("/sendMessage", (req, res) => {
-  console.log("sendMessage called");
+  console.log("sendMessage API endpoint triggered");
   let resData = {
     status: false,
     answare: "",
   };
+
   try {
+    // Determine Token (handles both raw token or 'Bearer <token>')
+    let token = process.env.WHATSAPP_TOKEN || process.env.SECRET_KEY || "";
+    if (token.startsWith("Bearer ")) {
+      token = token.replace("Bearer ", "").trim();
+    }
+
+    const phoneNumberId = process.env.PHONE_NUMBER_ID || "893818507150447";
+    const apiVersion = process.env.API_VERSION || "v22.0";
+    const recipient = process.env.TO || "+8801310861071";
+    const templateName = process.env.TEMPLATE_NAME || "hello_world";
+    const languageCode = process.env.TEMPLATE_LANG || "en_US";
+
     const options = {
       method: "POST",
-      url: "https://graph.facebook.com/v22.0/893818507150447/messages",
+      url: `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`,
       headers: {
-        Authorization: `Bearer EAAQnIyphkEkBQBIGB9sZCUZAtch3HYTnnLtsT9aEZC9AAVs1J6u5JUovpuZCzVpfyOQzxNAhjMYYS6bZAWzl9Lt3F2HgEbhYesLglMbVAhAqZCKrvRH9qdXdkumV289zmCrNXA2OLBb0eroq9P4HBrdqP4ZCszpV5NJ3sgFNfyWN9QZBvWm0ZCiAwveAyM4Y6UvYxJ0z8nNDZBmm2h1OrkusGNBCGgxzUBdrUcaDPv8zo74ZBiuZASbrT8p72AMhGU8eyjVqJ4LP2OcQQdFUmSkKjoTE`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: {
         messaging_product: "whatsapp",
-        to: "+8801310861071",
+        to: recipient,
         type: "template",
         template: {
-          name: "hello_world",
+          name: templateName,
           language: {
-            code: "en_US",
+            code: languageCode,
           },
         },
       },
       json: true,
     };
+
     request(options, function (error, response, body) {
-      console.log("error ", error);
-      if (error) throw new Error(error);
-      //+++++++++++++++++++++++++++++++++++++++++++++
-      resData.status = true;
+      if (error) {
+        console.error("WhatsApp API Request Error:", error);
+        resData.status = false;
+        resData.answare = error.message || error;
+        return res.status(500).json(resData);
+      }
+
+      console.log("Meta API Response Body:", body);
+      resData.status = response.statusCode >= 200 && response.statusCode < 300;
       resData.respondData = body;
 
-      console.log("resData ", resData);
-      return res.status(200).json(resData);
+      return res.status(response.statusCode).json(resData);
     });
   } catch (e) {
+    console.error("Internal Server Error:", e);
     resData.status = false;
-    resData.answare = e;
-    return res.status(200).json(resData);
+    resData.answare = e.message || e;
+    return res.status(500).json(resData);
   }
 });
+
 //+++++++++++++++++++++++++++++++++++++++++++++++++
+// Server Listen
 //+++++++++++++++++++++++++++++++++++++++++++++++++
-app.listen(3000, () => {
-  console.log("starting...");
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`WhatsApp API Server running on http://localhost:${PORT}`);
 });
+
